@@ -1,0 +1,589 @@
+---
+title: "Experimento Aiden"
+author: "Luis Felipe de Moraes"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    toc_depth: 4
+---
+
+<style>
+#TOC {
+  color: #007681;
+  font-family: Helvetica Neue;
+  border-color: #005F86;
+}
+body {
+  background-color: #f5f5f5;
+  font-family: Adobe Garamond Pro;
+}
+#header {
+ color: #005F86;
+ background-color: #f5f5f5;
+ font-family: Helvetica Neue;
+ font-size: 20px;
+}
+h1 {
+ color: #007681;
+ background-color: #f5f5f5;
+ font-family: Helvetica Neue;
+ font-size: 20px;
+}
+h2 {
+ color: #279989;
+ background-color: #f5f5f5;
+ font-family: Helvetica Neue;
+ font-size: 20px;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+![](C:\Users\f812330\OneDrive - Cargill Inc\Desktop\Exemplos Gráficos\Cows\NavTX26_4-2018-6915-2.jpg)
+
+```{r head_main, include = FALSE}
+
+library(tidyverse)
+library(naniar)
+library(readxl)
+library(writexl)
+library(ggrepel)
+library(kableExtra)
+library(rebus)
+library(TTR)
+library(pracma)
+library(tidyquant)
+library(forecast)
+library(janitor)
+library(lmerTest)
+library(emmeans)
+library(lme4)
+library(car)
+library(broom)
+library(sjPlot)
+library(ggeffects)
+library(performance)
+library(lattice)
+library(feather)
+
+options(scipen=999)
+
+cargill_color_blue <- c("#279989","#007681","#005F86")
+cargill_color_red <- c("#9E2A2F","#BE531C","#CF7F00")
+cargill_color_orange <- c("#DAAA00","#ABAD25","#658D1B")
+
+cargill_color_all <- c("#9E2A2F","#BE531C","#CF7F00","#DAAA00","#ABAD25","#658D1B",
+                       "#279989","#007681","#005F86")
+
+df <- read_feather("dados_exp.feather")
+micotoxinas <- read_feather("dados_micotoxinas.feather")
+
+
+# kg para Lb: 1 = 2.20462
+
+df <- df %>%
+  select(-95, -96)
+
+#df$LACT <- ifelse(df$LACT == 1, "Primípara", "Multípara")
+
+
+
+df_selected <- df %>%
+  select(COW, WEEKYEAR, TREAT, LACT, BRIXCOL, starts_with("PROD"))
+
+
+names(df_selected) <- c("COW","WEEK","TREAT" ,"LACT","BRIX_COL" , "PROD01W", "PROD02W", "PROD03W", "PROD04W", "PROD05W",
+                        "PROD06W", "PROD07W", "PROD08W", "PROD09W", "PROD10W", "PROD11W", "PROD12W")
+
+
+
+new_pivot <- df_selected %>%
+  pivot_longer(cols = c(PROD01W,PROD02W,PROD03W,PROD04W,PROD05W,PROD06W,PROD07W,PROD08W,PROD09W,PROD10W,PROD11W,PROD12W), values_to = "valores", names_to = "producao")
+
+
+#new_pivot[is.na(new_pivot)] <- 0
+
+
+df_summ <- df %>%
+  group_by(TREAT) %>%
+  summarize(ECM_avg_w02 = mean(ECM2W, na.rm = TRUE), MF_avg_w02 = mean(MF2W, na.rm = TRUE), MP_avg_w02 = mean(MP2W, na.rm = TRUE), 
+            ECM_avg_w03 = mean(ECM3W, na.rm = TRUE), MF_avg_w03 = mean(MF3W, na.rm = TRUE), MP_avg_w03 = mean(MP3W, na.rm = TRUE), 
+            ECM_avg_w04 = mean(ECM4W, na.rm = TRUE), MF_avg_w04 = mean(MF4W, na.rm = TRUE), MP_avg_w04 = mean(MP4W, na.rm = TRUE),
+            ECM_avg_w05 = mean(ECM5W, na.rm = TRUE), MF_avg_w05 = mean(MF5W, na.rm = TRUE), MP_avg_w05 = mean(MP5W, na.rm = TRUE),
+            ECM_avg_w06 = mean(ECM6W, na.rm = TRUE), MF_avg_w06 = mean(MF6W, na.rm = TRUE), MP_avg_w06 = mean(MP6W, na.rm = TRUE),
+            ECM_avg_w07 = mean(ECM7W, na.rm = TRUE), MF_avg_w07 = mean(MF7W, na.rm = TRUE), MP_avg_w07 = mean(MP7W, na.rm = TRUE),
+            ECM_avg_w08 = mean(ECM8W, na.rm = TRUE), MF_avg_w08 = mean(MF8W, na.rm = TRUE), MP_avg_w08 = mean(MP8W, na.rm = TRUE),
+            ECM_avg_w09 = mean(ECM9W, na.rm = TRUE), MF_avg_w09 = mean(MF9W, na.rm = TRUE), MP_avg_w09 = mean(MP9W, na.rm = TRUE),
+            ECM_avg_w10 = mean(ECM10W, na.rm = TRUE), MF_avg_w10 = mean(MF10W, na.rm = TRUE), MP_avg_w10 = mean(MP10W, na.rm = TRUE),
+            ECM_avg_w11 = mean(ECM11W, na.rm = TRUE), MF_avg_w11 = mean(MF11W, na.rm = TRUE), MP_avg_w11 = mean(MP11W, na.rm = TRUE),
+            ECM_avg_w12 = mean(ECM12W, na.rm = TRUE), MF_avg_w12 = mean(MF12W, na.rm = TRUE), MP_avg_w12 = mean(MP12W, na.rm = TRUE),
+            MPRod_avg_w01 = mean(PROD1W, na.rm = TRUE),
+            MPRod_avg_w02 = mean(PROD2W, na.rm = TRUE),
+            MPRod_avg_w03 = mean(PROD3W, na.rm = TRUE),
+            MPRod_avg_w04 = mean(PROD4W, na.rm = TRUE),
+            MPRod_avg_w05 = mean(PROD5W, na.rm = TRUE),
+            MPRod_avg_w06 = mean(PROD6W, na.rm = TRUE),
+            MPRod_avg_w07 = mean(PROD7W, na.rm = TRUE),
+            MPRod_avg_w08 = mean(PROD8W, na.rm = TRUE),
+            MPRod_avg_w09 = mean(PROD9W, na.rm = TRUE),
+            MPRod_avg_w10 = mean(PROD10W, na.rm = TRUE),
+            MPRod_avg_w11 = mean(PROD11W, na.rm = TRUE),
+            MPRod_avg_w12 = mean(PROD12W, na.rm = TRUE))
+
+df_summ_lact <- df %>%
+  group_by(TREAT, LACT) %>%
+  summarize(ECM_avg_w02 = mean(ECM2W, na.rm = TRUE), MF_avg_w02 = mean(MF2W, na.rm = TRUE), MP_avg_w02 = mean(MP2W, na.rm = TRUE), 
+            ECM_avg_w03 = mean(ECM3W, na.rm = TRUE), MF_avg_w03 = mean(MF3W, na.rm = TRUE), MP_avg_w03 = mean(MP3W, na.rm = TRUE), 
+            ECM_avg_w04 = mean(ECM4W, na.rm = TRUE), MF_avg_w04 = mean(MF4W, na.rm = TRUE), MP_avg_w04 = mean(MP4W, na.rm = TRUE),
+            ECM_avg_w05 = mean(ECM5W, na.rm = TRUE), MF_avg_w05 = mean(MF5W, na.rm = TRUE), MP_avg_w05 = mean(MP5W, na.rm = TRUE),
+            ECM_avg_w06 = mean(ECM6W, na.rm = TRUE), MF_avg_w06 = mean(MF6W, na.rm = TRUE), MP_avg_w06 = mean(MP6W, na.rm = TRUE),
+            ECM_avg_w07 = mean(ECM7W, na.rm = TRUE), MF_avg_w07 = mean(MF7W, na.rm = TRUE), MP_avg_w07 = mean(MP7W, na.rm = TRUE),
+            ECM_avg_w08 = mean(ECM8W, na.rm = TRUE), MF_avg_w08 = mean(MF8W, na.rm = TRUE), MP_avg_w08 = mean(MP8W, na.rm = TRUE),
+            ECM_avg_w09 = mean(ECM9W, na.rm = TRUE), MF_avg_w09 = mean(MF9W, na.rm = TRUE), MP_avg_w09 = mean(MP9W, na.rm = TRUE),
+            ECM_avg_w10 = mean(ECM10W, na.rm = TRUE), MF_avg_w10 = mean(MF10W, na.rm = TRUE), MP_avg_w10 = mean(MP10W, na.rm = TRUE),
+            ECM_avg_w11 = mean(ECM11W, na.rm = TRUE), MF_avg_w11 = mean(MF11W, na.rm = TRUE), MP_avg_w11 = mean(MP11W, na.rm = TRUE),
+            ECM_avg_w12 = mean(ECM12W, na.rm = TRUE), MF_avg_w12 = mean(MF12W, na.rm = TRUE), MP_avg_w12 = mean(MP12W, na.rm = TRUE),
+            MPRod_avg_w01 = mean(PROD1W, na.rm = TRUE),
+            MPRod_avg_w02 = mean(PROD2W, na.rm = TRUE),
+            MPRod_avg_w03 = mean(PROD3W, na.rm = TRUE),
+            MPRod_avg_w04 = mean(PROD4W, na.rm = TRUE),
+            MPRod_avg_w05 = mean(PROD5W, na.rm = TRUE),
+            MPRod_avg_w06 = mean(PROD6W, na.rm = TRUE),
+            MPRod_avg_w07 = mean(PROD7W, na.rm = TRUE),
+            MPRod_avg_w08 = mean(PROD8W, na.rm = TRUE),
+            MPRod_avg_w09 = mean(PROD9W, na.rm = TRUE),
+            MPRod_avg_w10 = mean(PROD10W, na.rm = TRUE),
+            MPRod_avg_w11 = mean(PROD11W, na.rm = TRUE),
+            MPRod_avg_w12 = mean(PROD12W, na.rm = TRUE))
+
+
+df_pivoted <- df_summ %>%
+  pivot_longer(cols = c(MPRod_avg_w01, MPRod_avg_w02, MPRod_avg_w03, MPRod_avg_w04, MPRod_avg_w05, MPRod_avg_w06, MPRod_avg_w07, MPRod_avg_w08,
+                    MPRod_avg_w09, MPRod_avg_w10, MPRod_avg_w11, MPRod_avg_w12, MF_avg_w02, MF_avg_w03, MF_avg_w04, MF_avg_w05,
+                    MF_avg_w06, MF_avg_w07, MF_avg_w08, MF_avg_w09, MF_avg_w10, MF_avg_w11, MF_avg_w12, MP_avg_w02, MP_avg_w03, MP_avg_w04, MP_avg_w05,
+                    MP_avg_w06, MP_avg_w07, MP_avg_w08, MP_avg_w09, MP_avg_w10, MP_avg_w11, MP_avg_w12, ECM_avg_w02, ECM_avg_w03, ECM_avg_w04, ECM_avg_w05,
+                    ECM_avg_w06, ECM_avg_w07, ECM_avg_w08, ECM_avg_w09, ECM_avg_w10, ECM_avg_w11, ECM_avg_w12))
+
+df_pivoted_lact <- df_summ_lact %>%
+  pivot_longer(cols = c(MPRod_avg_w01, MPRod_avg_w02, MPRod_avg_w03, MPRod_avg_w04, MPRod_avg_w05, MPRod_avg_w06, MPRod_avg_w07, MPRod_avg_w08,
+                        MPRod_avg_w09, MPRod_avg_w10, MPRod_avg_w11, MPRod_avg_w12, MF_avg_w02, MF_avg_w03, MF_avg_w04, MF_avg_w05,
+                        MF_avg_w06, MF_avg_w07, MF_avg_w08, MF_avg_w09, MF_avg_w10, MF_avg_w11, MF_avg_w12, MP_avg_w02, MP_avg_w03, MP_avg_w04, MP_avg_w05,
+                        MP_avg_w06, MP_avg_w07, MP_avg_w08, MP_avg_w09, MP_avg_w10, MP_avg_w11, MP_avg_w12, ECM_avg_w02, ECM_avg_w03, ECM_avg_w04, ECM_avg_w05,
+                        ECM_avg_w06, ECM_avg_w07, ECM_avg_w08, ECM_avg_w09, ECM_avg_w10, ECM_avg_w11, ECM_avg_w12))
+
+
+df_pivoted$week <- case_when(
+                            df_pivoted$name == "MPRod_avg_w01" ~ "Week 01",
+                            df_pivoted$name %in% c("MPRod_avg_w02", "MF_avg_w02", "MP_avg_w02", "ECM_avg_w02") ~ "Week 02",
+                            df_pivoted$name %in% c("MPRod_avg_w03", "MF_avg_w03", "MP_avg_w03", "ECM_avg_w03") ~ "Week 03",
+                            df_pivoted$name %in% c("MPRod_avg_w04", "MF_avg_w04", "MP_avg_w04", "ECM_avg_w04") ~ "Week 04",
+                            df_pivoted$name %in% c("MPRod_avg_w05", "MF_avg_w05", "MP_avg_w05", "ECM_avg_w05") ~ "Week 05",
+                            df_pivoted$name %in% c("MPRod_avg_w06", "MF_avg_w06", "MP_avg_w06", "ECM_avg_w06") ~ "Week 06",
+                            df_pivoted$name %in% c("MPRod_avg_w07", "MF_avg_w07", "MP_avg_w07", "ECM_avg_w07") ~ "Week 07",
+                            df_pivoted$name %in% c("MPRod_avg_w08", "MF_avg_w08", "MP_avg_w08", "ECM_avg_w08") ~ "Week 08",
+                            df_pivoted$name %in% c("MPRod_avg_w09", "MF_avg_w09", "MP_avg_w09", "ECM_avg_w09") ~ "Week 09",
+                            df_pivoted$name %in% c("MPRod_avg_w10", "MF_avg_w10", "MP_avg_w10", "ECM_avg_w10") ~ "Week 10",
+                            df_pivoted$name %in% c("MPRod_avg_w11", "MF_avg_w11", "MP_avg_w11", "ECM_avg_w11") ~ "Week 11",
+                            df_pivoted$name %in% c("MPRod_avg_w12", "MF_avg_w12", "MP_avg_w12", "ECM_avg_w12") ~ "Week 12"
+                            )
+
+df_pivoted$name <- case_when(
+                            df_pivoted$name %in% c("MPRod_avg_w01", "MPRod_avg_w02","MPRod_avg_w03","MPRod_avg_w04","MPRod_avg_w05",
+                                                   "MPRod_avg_w06","MPRod_avg_w07","MPRod_avg_w08","MPRod_avg_w09",
+                                                   "MPRod_avg_w10","MPRod_avg_w11","MPRod_avg_w12") ~ "MProd",
+                            df_pivoted$name %in% c("MF_avg_w02","MF_avg_w03","MF_avg_w04","MF_avg_w05",
+                                                   "MF_avg_w06","MF_avg_w07","MF_avg_w08","MF_avg_w09",
+                                                   "MF_avg_w10","MF_avg_w11","MF_avg_w12") ~ "MFat",
+                            df_pivoted$name %in% c("MP_avg_w02","MP_avg_w03","MP_avg_w04","MP_avg_w05",
+                                                   "MP_avg_w06","MP_avg_w07","MP_avg_w08","MP_avg_w09",
+                                                   "MP_avg_w10","MP_avg_w11","MP_avg_w12") ~ "MProtein",
+                            df_pivoted$name %in% c("ECM_avg_w02","ECM_avg_w03","ECM_avg_w04","ECM_avg_w05",
+                                                   "ECM_avg_w06","ECM_avg_w07","ECM_avg_w08","ECM_avg_w09",
+                                                   "ECM_avg_w10","ECM_avg_w11","ECM_avg_w12") ~ "ECM"
+                            )
+
+df_pivoted_lact$week <- case_when(
+  df_pivoted_lact$name == "MPRod_avg_w01" ~ "Week 01",
+  df_pivoted_lact$name %in% c("MPRod_avg_w02", "MF_avg_w02", "MP_avg_w02", "ECM_avg_w02") ~ "Week 02",
+  df_pivoted_lact$name %in% c("MPRod_avg_w03", "MF_avg_w03", "MP_avg_w03", "ECM_avg_w03") ~ "Week 03",
+  df_pivoted_lact$name %in% c("MPRod_avg_w04", "MF_avg_w04", "MP_avg_w04", "ECM_avg_w04") ~ "Week 04",
+  df_pivoted_lact$name %in% c("MPRod_avg_w05", "MF_avg_w05", "MP_avg_w05", "ECM_avg_w05") ~ "Week 05",
+  df_pivoted_lact$name %in% c("MPRod_avg_w06", "MF_avg_w06", "MP_avg_w06", "ECM_avg_w06") ~ "Week 06",
+  df_pivoted_lact$name %in% c("MPRod_avg_w07", "MF_avg_w07", "MP_avg_w07", "ECM_avg_w07") ~ "Week 07",
+  df_pivoted_lact$name %in% c("MPRod_avg_w08", "MF_avg_w08", "MP_avg_w08", "ECM_avg_w08") ~ "Week 08",
+  df_pivoted_lact$name %in% c("MPRod_avg_w09", "MF_avg_w09", "MP_avg_w09", "ECM_avg_w09") ~ "Week 09",
+  df_pivoted_lact$name %in% c("MPRod_avg_w10", "MF_avg_w10", "MP_avg_w10", "ECM_avg_w10") ~ "Week 10",
+  df_pivoted_lact$name %in% c("MPRod_avg_w11", "MF_avg_w11", "MP_avg_w11", "ECM_avg_w11") ~ "Week 11",
+  df_pivoted_lact$name %in% c("MPRod_avg_w12", "MF_avg_w12", "MP_avg_w12", "ECM_avg_w12") ~ "Week 12"
+)
+
+df_pivoted_lact$name <- case_when(
+  df_pivoted_lact$name %in% c("MPRod_avg_w01", "MPRod_avg_w02","MPRod_avg_w03","MPRod_avg_w04","MPRod_avg_w05",
+                         "MPRod_avg_w06","MPRod_avg_w07","MPRod_avg_w08","MPRod_avg_w09",
+                         "MPRod_avg_w10","MPRod_avg_w11","MPRod_avg_w12") ~ "MProd",
+  df_pivoted_lact$name %in% c("MF_avg_w02","MF_avg_w03","MF_avg_w04","MF_avg_w05",
+                         "MF_avg_w06","MF_avg_w07","MF_avg_w08","MF_avg_w09",
+                         "MF_avg_w10","MF_avg_w11","MF_avg_w12") ~ "MFat",
+  df_pivoted_lact$name %in% c("MP_avg_w02","MP_avg_w03","MP_avg_w04","MP_avg_w05",
+                         "MP_avg_w06","MP_avg_w07","MP_avg_w08","MP_avg_w09",
+                         "MP_avg_w10","MP_avg_w11","MP_avg_w12") ~ "MProtein",
+  df_pivoted_lact$name %in% c("ECM_avg_w02","ECM_avg_w03","ECM_avg_w04","ECM_avg_w05",
+                         "ECM_avg_w06","ECM_avg_w07","ECM_avg_w08","ECM_avg_w09",
+                         "ECM_avg_w10","ECM_avg_w11","ECM_avg_w12") ~ "ECM"
+)
+
+# todas juntas
+df_prod_mean <- df_pivoted %>%
+  filter(name == "MProd") %>%
+  group_by(TREAT, week) %>%
+  summarize(media_prd = mean(value))
+
+
+# Visão Evolutiva da Produção
+df_total_controle <- df_prod_mean %>%
+  filter(TREAT == "CONTROLE")
+df_total_maxima <- df_prod_mean %>%
+  filter(TREAT == "MAXIMA")
+df_total_repro <- df_prod_mean %>%
+  filter(TREAT == "REPRO")
+df_total_solidos <- df_prod_mean %>%
+  filter(TREAT == "SOLIDOS")
+
+
+total_controle <- sum(df_total_controle$media_prd)
+total_maxima <- sum(df_total_maxima$media_prd)
+total_repro <- sum(df_total_repro$media_prd)
+total_solidos <- sum(df_total_solidos$media_prd)
+
+resultado_maxima <- round(((total_maxima/total_controle)*100)-100,2)
+resultado_repro <- round(((total_repro/total_controle)*100)-100,2)
+resultado_solidos <- round(((total_solidos/total_controle)*100)-100,2)
+
+
+df_prodECM_mean <- df_pivoted %>%
+  filter(name == "ECM") %>%
+  group_by(TREAT, week) %>%
+  summarize(media_prd = mean(value))
+
+std_dev_ECM <- std(df_prodECM_mean$media_prd)
+
+total_controle_ECM <- df_prodECM_mean %>%
+  filter(TREAT == "CONTROLE")
+total_maxima_ECM <- df_prodECM_mean %>%
+  filter(TREAT == "MAXIMA")
+total_repro_ECM <- df_prodECM_mean %>%
+  filter(TREAT == "REPRO")
+total_solido_ECM <- df_prodECM_mean %>%
+  filter(TREAT == "SOLIDOS")
+
+total_controle_ECM <- sum(total_controle_ECM$media_prd)
+total_maxima_ECM <- sum(total_maxima_ECM$media_prd)
+total_repro_ECM <- sum(total_repro_ECM$media_prd)
+total_solidos_ECM <- sum(total_solido_ECM$media_prd)
+
+resultado_maxima_ECM <- round(((total_maxima_ECM/total_controle_ECM)*100)-100,2)
+resultado_repro_ECM <- round(((total_repro_ECM/total_controle_ECM)*100)-100,2)
+resultado_solidos_ECM <- round(((total_solidos_ECM/total_controle_ECM)*100)-100,2)
+
+
+df_embrio <- read_excel("Coleta de dados experimento Aiden 2023 - dados finais 10-2023 Tiago.xlsx", "SAS Format 2")
+
+df_embrio <- df_embrio %>%
+  filter(TREAT %in% c("CONTROLE", "REPRO"), SUPEROV == 1)
+
+df_embrio$CQEI <- round(df_embrio$CQEI,1)
+
+df_embrio %>% 
+  filter(TREAT %in% c("CONTROLE", "REPRO")) %>%
+  group_by(TREAT) %>% 
+  plot_frq(TOTSTRUCT, type = "histogram", show.mean = TRUE) %>% 
+  plot_grid()
+  
+```
+
+# Produção de Leite
+
+## Análise Exploratória dos dados
+
+```{r milk_prod, echo=FALSE, fig.align = 'center', message = FALSE, warning = FALSE}
+ggplot(df_prod_mean, aes(week, media_prd, group = TREAT, color = TREAT)) + 
+  geom_line() +
+  geom_point() +
+  theme_bw() +
+  scale_fill_manual(values = cargill_color_all) +
+  labs(title = "Variação da Produção de Leite",
+       subtitle = "Por tratamento",
+       x = "Tratamento",
+       y = "Produção Média em Litros") +
+  theme(axis.text.x = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        legend.position = "bottom")
+```
+
+```{r milk_prod_ecm, echo=FALSE, fig.align = 'center', message = FALSE, warning = FALSE}
+ggplot(df_prodECM_mean, aes(week, media_prd, group = TREAT, color = TREAT)) + 
+  geom_line() +
+  geom_point() +
+  theme_bw() +
+  scale_fill_manual(values = cargill_color_all) +
+  labs(title = "Variação da Produção de Leite - Energy Corrected Milk",
+       subtitle = "Por tratamento",
+       x = "Tratamento",
+       y = "Produção Média em Litros") +
+  theme(axis.text.x = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        legend.position = "bottom")
+```
+
+
+```{r milk_prod_comparativa, echo=FALSE, fig.align = 'center', message = FALSE, warning = FALSE}
+
+# Produção média geral - visão ampla
+
+df_pivoted_lact %>%
+  filter(name %in% c("ECM","MProd")) %>%
+  group_by(TREAT, name) %>%
+  ggplot(aes(TREAT, value, fill = TREAT)) + 
+  geom_boxplot() + 
+  theme_bw() +
+  scale_fill_manual(values = cargill_color_all) +
+  labs(title = "Variação da Produção de Leite",
+       subtitle = "Variação dos dados de produção médios",
+       x = "Tratamento",
+       y = "Produção em Litros") +
+  theme(legend.position = "none")
+```
+
+
+```{r milk_prod_hist, echo=FALSE, fig.align = 'center', message = FALSE, warning = FALSE}
+
+# Produção média geral - visão ampla
+
+theme_set(theme_bw())
+new_pivot %>%
+  plot_frq(valores,
+           type = "histogram",
+           show.mean = TRUE,
+           normal.curve = TRUE,
+           title = "Distribuição das Medidas de Produção de Leite",
+           show.sd = TRUE)
+```
+
+```{r milk_prod_hist_treat, echo=FALSE, fig.align = 'center', message = FALSE, warning = FALSE}
+
+# Produção média geral - visão ampla
+
+new_pivot %>% 
+  group_by(TREAT) %>% 
+  plot_frq(valores,
+           type = "histogram",
+           show.mean = TRUE,
+           normal.curve = TRUE,
+           title = "Distribuição das Medidas de Produção de Leite - Por Tratamento",
+           show.sd = TRUE) %>% 
+  plot_grid()
+
+```
+
+```{r milk_pri_multi, echo=FALSE, fig.align = 'center', message = FALSE, warning = FALSE}
+
+# Produção média geral - primiparas e multíparas
+
+for_plot <- df_pivoted_lact %>%
+  filter(name == "MProd") %>%
+  group_by(TREAT, LACT)
+
+for_plot$prop <- case_when(for_plot$TREAT == "CONTROLE" ~ 0,
+                           for_plot$TREAT == "MAXIMA" ~ resultado_maxima_ECM,
+                           for_plot$TREAT == "REPRO" ~ resultado_repro_ECM,
+                           for_plot$TREAT == "SOLIDOS" ~ resultado_solidos_ECM) 
+
+ggplot(for_plot, aes(TREAT, value, fill = TREAT)) + 
+  geom_boxplot() +
+  facet_wrap(~LACT) +
+  theme_bw() +
+  scale_fill_manual(values = cargill_color_all) +
+  labs(title = "Variação da Produção de Leite",
+       subtitle = "Vacas Primíparas e Multíparas",
+       x = "Tratamento",
+       y = "Produção em Litros") +
+  theme(strip.background = element_rect(fill = "#005F86", colour = "#005F86"),
+        legend.position = "none")
+```  
+
+
+```{r milk_prod_comparativa_separada, echo=FALSE, fig.align = 'center', message = FALSE, warning = FALSE}
+
+# Produção média geral - corrigido e não corrigido - visão ampla
+
+df_pivoted_lact %>%
+  filter(name %in% c("ECM","MProd")) %>%
+  group_by(TREAT, name) %>%
+  ggplot(aes(TREAT, value, fill = TREAT)) + 
+  geom_boxplot() +
+  facet_wrap(~name) + 
+  theme_bw() +
+  scale_fill_manual(values = cargill_color_all) +
+  labs(title = "Variação da Produção de Leite",
+       subtitle = "Com e sem Correção de Energia",
+       x = "Tratamento",
+       y = "Produção em Litros") +
+  theme(strip.background = element_rect(fill = "#005F86", colour = "#005F86"),
+        legend.position = "none") 
+```
+
+```{r milk_fat, echo=FALSE, fig.align = 'center', message = FALSE, warning = FALSE}
+
+# Produção média geral - milk fat
+
+df_pivoted_lact %>%
+  filter(name %in% c("MFat")) %>%
+  group_by(TREAT, LACT) %>%
+  ggplot(aes(TREAT, value, fill = TREAT)) + 
+  geom_boxplot() +
+  theme_bw() +
+  scale_fill_manual(values = cargill_color_all) +
+  labs(title = "Variação na Gordura do Leite",
+       x = "Tratamento",
+       y = "Presença em %") +
+  theme(legend.position = "none")
+  #      strip.background = element_rect(fill = "#005F86", colour = "#005F86")
+```
+
+```{r milk_protein, echo=FALSE, fig.align = 'center', message = FALSE, warning = FALSE}
+
+# Produção média geral - Protein
+
+df_pivoted_lact %>%
+  filter(name %in% c("MProtein")) %>%
+  group_by(TREAT, LACT) %>%
+  ggplot(aes(TREAT, value, fill = TREAT)) + 
+  geom_boxplot() +
+  theme_bw() +
+  scale_fill_manual(values = cargill_color_all) +
+  labs(title = "Variação da Proteína de Leite",
+       x = "Tratamento",
+       y = "Presença em %") +
+  theme(legend.position = "none")
+  #      strip.background = element_rect(fill = "#005F86", colour = "#005F86"))
+```      
+
+## Modelagem LMM - LEITE
+
+Análise Linear de Efeitos Mistos com Medidas Repetidas no Tempo (Dados Longitudinais)
+
+Nessa análise buscou-se explicar os dados e suas correlações, validando a Hipótese Alternativa de que o Tratamento faz diferença em relação à produção de leite entre os grupos testados. A Hipótese Nula por sua vez, mantém que a diferença é inexistente. 
+
+Usou-se a biblioteca 'lme4' em R para o processamento dos dados e os mesmos foram submetivos a uma ampla quantidade de modelos comparativos em busca do que melhor explicasse os dados presentes no estudo. 
+
+<br>
+<br>
+
+```{r Aplicacao_modelo}
+modelodb1<- lmer(valores ~ TREAT * producao + (1 | COW) + (1 | TREAT) + LACT + WEEK,
+                 data=new_pivot,
+                 control = lmerControl(optimizer ="Nelder_Mead"))
+
+model_performance(modelodb1)
+```
+
+```{r resultados_modelo, echo = FALSE, message = FALSE, warning = FALSE, fig.align = 'center'}
+summary(modelodb1)
+
+```
+
+
+```{r resultados_tabela, echo = FALSE, message = FALSE, warning = FALSE, fig.align = 'center'}
+tab_model(modelodb1, 
+          show.reflvl = TRUE, 
+          show.intercept = FALSE, 
+          p.style = "numeric_stars")
+```
+
+```{r resultados_modelo_predicao, echo = FALSE, message = FALSE, warning = FALSE, fig.align = 'center'}
+plot_model(modelodb1, type = "pred", terms = c("producao","TREAT"),
+           title = "Predição de Valores Baseados no Modelo",
+           legend.title = "Tratamento")
+```
+
+```{r resultados_residuals, echo = FALSE, message = FALSE, warning = FALSE, fig.align = 'center'}
+plot(modelodb1)
+```
+
+# Produção de Embriões
+
+## Análise Exploratória de Dados
+
+```{r resultados_distribuicao_embrio, echo = FALSE, message = FALSE, warning = FALSE, fig.align = 'center'}
+df_embrio %>% 
+  filter(TREAT %in% c("CONTROLE", "REPRO")) %>%
+  group_by(TREAT) %>% 
+  plot_frq(TOTSTRUCT, type = "histogram", show.mean = TRUE) %>% 
+  plot_grid()
+```
+
+```{r resultados_frequencias_embrio, echo = FALSE, message = FALSE, warning = FALSE, fig.align = 'center'}
+theme_set(theme_bw())
+plot_grpfrq(df_embrio$TOTSTRUCT,
+            df_embrio$TREAT,
+            geom.colors = cargill_color_blue,
+            title = "Distribuição de Produção de Embrião - Por Tratamento")
+```
+
+## Modelagem LMM - EMBRIÕES
+
+Análise Linear de Efeitos Mistos com Medidas Repetidas no Tempo (Dados Longitudinais)
+
+Nessa análise buscou-se explicar os dados e suas correlações, validando a Hipótese Alternativa de que o Tratamento faz diferença em relação à produção de leite entre os grupos testados. A Hipótese Nula por sua vez, mantém que a diferença é inexistente. 
+
+Usou-se a biblioteca 'lme4' em R para o processamento dos dados e os mesmos foram submetivos a uma ampla quantidade de modelos comparativos em busca do que melhor explicasse os dados presentes no estudo. 
+
+<br>
+<br>
+
+```{r Aplicacao_modelo_embrio, fig.align = 'center'}
+m.nball <- lmer(TOTSTRUCT ~ TREAT + ( 1 | COW) + FLUSHDIM + FLUSHMILK + FLUSHMF + FLUSHSCC + LACTN + FLUSHWEEK + CQEI, data = df_embrio)
+
+model_performance(m.nball)
+```
+
+```{r resultados_modelo_embrio, echo = FALSE, message = FALSE, warning = FALSE, fig.align = 'center'}
+summary(m.nball)
+
+```
+
+```{r resultados_tabela_embrio, echo = FALSE, message = FALSE, warning = FALSE, fig.align = 'center'}
+tab_model(m.nball, 
+          show.reflvl = TRUE, 
+          show.intercept = FALSE, 
+          p.style = "numeric_stars")
+```
+
+
+```{r resultados_residuals_embrio, echo = FALSE, message = FALSE, warning = FALSE, fig.align = 'center'}
+plot(m.nball)
+```
+
+<br><br>
+
+# Conclusão
+
+Com base nas análises executadas chegam-se às conclusões: 
+
+-> Quando a produção de leite: O tratamento 'Máxima' e 'Repro' não apresentaram melhora significativa em relação ao controle utilizado, ficando a maior diferença com o 'Sólidos', que deveria ter sido o mais próximo do Controle. 
+
+-> Quanto a promoção de fertilidade: O tratamento 'Repro' não promoveu melhora em relação ao Controle, tendo o segundo grupo, criado embriões mais saudáveis e em quantidades mais adequadas ao longo do experimento.
+
+Recomenda-se a repetição do estudo, para compensar o baixo n de amostras empregados e estudar uma metodologia alternativa, como o emprego do Quadrado Latino, para melhorar a representatividade das amostras eliminando efeitos adjacentes que ocorrem naturalmente nesse tipo de estudo. 
+
+
+<br><br>
+<div align = "center"><font size = 2>
+![](C:\Users\f812330\OneDrive - Cargill Inc\Desktop\Exemplos Gráficos\cargill.png){width="20%"}
+
+**CONFIDENCIAL** - This document contains Cargill Confidencial Information. Disclosure, use or reproduction outside Cargill, or inside Cargill, to or by those do not have a need to know is prohibited. © Cargill, incorporated. All rights reserved.
+
+</font></div>
